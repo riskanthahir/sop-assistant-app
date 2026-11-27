@@ -412,23 +412,19 @@ class QuotaExhaustedError extends Error {
   }
 }
 
-async function embedBatchWithRetry(ai, texts) {
+async function embedRequestWithRetry(ai, contents) {
   const maxRetries = 5;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const res = await ai.models.embedContent({
         model: EMBED_MODEL,
-        contents: texts,
+        contents,
         config: {
           taskType: 'RETRIEVAL_DOCUMENT',
           outputDimensionality: EMBED_DIM,
         },
       });
-      const vectors = (res.embeddings || []).map((e) => e.values || []);
-      if (vectors.length !== texts.length) {
-        throw new Error(`Expected ${texts.length} embeddings, got ${vectors.length}`);
-      }
-      return vectors;
+      return (res.embeddings || []).map((e) => e.values || []);
     } catch (err) {
       const status = err?.status || err?.code || 0;
       const msg = String(err?.message || err || '');
@@ -456,6 +452,32 @@ async function embedBatchWithRetry(ai, texts) {
       await sleep(backoff);
     }
   }
+}
+
+async function embedBatchWithRetry(ai, texts) {
+  // Pass Content objects (not plain strings) so @google/genai keeps each chunk separate
+  // instead of merging string arrays into a single multimodal embedding for gemini-embedding-2.
+  const contentItems = texts.map((text) => ({ role: 'user', parts: [{ text }] }));
+  const vectors = await embedRequestWithRetry(ai, contentItems);
+  if (vectors.length === texts.length) {
+    return vectors;
+  }
+
+  // Fallback to individual embedding calls if an endpoint collapses batch items
+  if (texts.length > 1) {
+    const individualVectors = [];
+    for (const text of texts) {
+      const single = await embedRequestWithRetry(ai, text);
+      if (single.length !== 1 || !single[0]?.length) {
+        throw new Error(`Expected 1 embedding for single chunk, got ${single.length}`);
+      }
+      individualVectors.push(single[0]);
+      await sleep(150);
+    }
+    return individualVectors;
+  }
+
+  throw new Error(`Expected ${texts.length} embeddings, got ${vectors.length}`);
 }
 
 async function readExistingIndex() {
@@ -759,8 +781,8 @@ async function main() {
           revision,
           status: 'error',
           pageCount: partial?.pageCount || 0,
-          chunkCount: 0,
-          headingCount: 0,
+          chunkCount: partial?.chunks?.length || 0,
+          headingCount: partial?.headingsFound?.length || 0,
           lowTextPages: partial?.lowTextPages || [],
           error: err?.message || String(err),
         });
