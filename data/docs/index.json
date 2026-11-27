@@ -1,6 +1,32 @@
 {
-  "generatedAt": "2026-11-27T04:51:23.417Z",
+  "generatedAt": "2026-11-27T04:56:46.815Z",
   "embedModel": "gemini-embedding-2",
   "dimensions": 768,
-  "docs": []
+  "docs": [
+    {
+      "docId": "huawei_standard_operation_procedure_2024_6_0",
+      "file": "HUAWEI_Standard Operation Procedure_2024 6.0.pdf",
+      "docTitle": "HUAWEI Standard Operation Procedure 2024 6.0",
+      "revision": "Rev 1",
+      "effectiveDate": "Unspecified",
+      "driveUrl": "",
+      "fileHash": "02fad3424edf160a04865d71e01b6ed17572cc96d43619a8cf1e7518d316ae8e",
+      "metaSignature": "6451b762a0b8931392aabbd32dcfa7f89247f985675f16b30ed3e3cf1be5fd54",
+      "pageCount": 214,
+      "chunkCount": 91,
+      "headingCount": 85,
+      "lowTextPages": [
+        44,
+        56,
+        89,
+        90,
+        130,
+        142,
+        188,
+        194,
+        195,
+        203
+      ]
+    }
+  ]
 }
