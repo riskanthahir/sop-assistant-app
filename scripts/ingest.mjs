@@ -437,7 +437,14 @@ async function embedBatchWithRetry(ai, texts) {
         status >= 500 ||
         /429|RESOURCE_EXHAUSTED|quota|rate|503|500|ETIMEDOUT|ECONNRESET/i.test(msg);
 
-      if (!isRetryable) throw err;
+      if (!isRetryable) {
+        if (/404|not found|not supported/i.test(msg)) {
+          throw new Error(
+            `Embedding model "${EMBED_MODEL}" failed (${msg}). Set EMBED_MODEL in GitHub Repository Variables (e.g. gemini-embedding-001) if your API key uses a different model name.`
+          );
+        }
+        throw err;
+      }
       if (attempt === maxRetries) {
         if (status === 429 || /429|RESOURCE_EXHAUSTED|quota/i.test(msg)) {
           throw new QuotaExhaustedError(msg);
@@ -613,6 +620,7 @@ async function main() {
     }
 
     if (!ai) {
+      console.error(`ERROR: GEMINI_API_KEY is missing — cannot embed ${relPath}. Add GEMINI_API_KEY under GitHub Settings -> Secrets and variables -> Actions.`);
       reportRows.push({
         file: relPath,
         docTitle,

@@ -64,5 +64,8 @@ jobs:
       - name: Fail if ingest stopped or errored
         if: steps.ingest.outputs.exit_code != '0'
         run: |
-          echo "Ingest exited with code ${{ steps.ingest.outputs.exit_code }}. Partial progress (if quota paused) has been committed; re-run this workflow to resume."
+          if [ -f data/ingest-report.md ]; then
+            cat data/ingest-report.md
+          fi
+          echo "Ingest exited with code ${{ steps.ingest.outputs.exit_code }}."
           exit ${{ steps.ingest.outputs.exit_code }}
