@@ -1,6 +1,6 @@
 # SOP Ingest Report
 
-Generated: 2026-11-27T04:45:50.296Z  
+Generated: 2026-11-27T04:51:23.418Z  
 Embedding model: `gemini-embedding-2` (768 dimensions)
 
 | Document | Status | Pages | Chunks | Headings | Low-Text Pages (Possible Scan) | Notes / Errors |
