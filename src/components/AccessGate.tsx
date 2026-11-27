@@ -68,10 +68,21 @@ export const AccessGate: React.FC<AccessGateProps> = ({
         )}
 
         <form onSubmit={(e) => void handleSubmit(e)} className="mt-5 space-y-4">
+          <input
+            type="text"
+            name="username"
+            autoComplete="username"
+            value={appName}
+            readOnly
+            tabIndex={-1}
+            aria-hidden="true"
+            className="sr-only"
+          />
           <div className="relative">
             <KeyRound className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
               type="password"
+              name="password"
               autoComplete="current-password"
               value={code}
               onChange={(e) => setCode(e.target.value)}
