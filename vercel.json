@@ -1,0 +1,24 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "functions": {
+    "api/chat.ts": {
+      "maxDuration": 60,
+      "includeFiles": "data/**"
+    },
+    "api/status.ts": {
+      "maxDuration": 10,
+      "includeFiles": "data/**"
+    },
+    "api/verify-access.ts": {
+      "maxDuration": 10
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/((?!api/|assets/|sw\\.js|workbox-|manifest\\.webmanifest|.*\\.(?:png|svg|ico|json|js|css|woff2?|txt|webmanifest)$).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

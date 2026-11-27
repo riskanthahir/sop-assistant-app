@@ -1,0 +1,10 @@
+{
+  "name": "SOP Assistant",
+  "description": "Mobile-first telecom SOP search and structured field procedure assistant in English, Sinhala, and Tamil.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

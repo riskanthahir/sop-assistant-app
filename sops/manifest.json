@@ -1,0 +1,18 @@
+[
+  {
+    "file": "SOP-FTTH-Install_Rev3_2026-10.pdf",
+    "title": "FTTH Drop Cable & ONT Installation Procedure",
+    "revision": "Rev 3.0",
+    "effectiveDate": "2026-10-01",
+    "status": "active",
+    "driveUrl": "https://drive.google.com/file/d/REPLACE_WITH_YOUR_FILE_ID/view"
+  },
+  {
+    "file": "SOP-FTTH-Install_Rev2_2024-05.pdf",
+    "title": "FTTH Drop Cable & ONT Installation Procedure",
+    "revision": "Rev 2.0",
+    "effectiveDate": "2024-05-15",
+    "status": "superseded",
+    "driveUrl": ""
+  }
+]
