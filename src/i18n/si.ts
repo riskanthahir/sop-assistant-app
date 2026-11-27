@@ -24,6 +24,9 @@ export const si: UIStrings = {
   micStop: 'නවත්වන්න',
   searchingStage: 'අනුමත SOP ලේඛන පරීක්ෂා කරමින්...',
   writingStage: 'කෙටි මාර්ගෝපදේශය සකසමින්...',
+  newChat: 'නව කතාබහ',
+  youLabel: 'ඔබ',
+  assistantLabel: 'SOP සහායක',
   examplesLabel: 'පොදු ක්ෂේත්‍ර ප්‍රශ්න',
   examples: [
     'දෝෂ සහිත battery bank module එකක් ආරක්ෂිතව මාරු කරන්නේ කෙසේද?',
@@ -50,7 +53,7 @@ export const si: UIStrings = {
     prerequisites: 'පූර්ව අවශ්‍යතා සහ අවසර',
     materialsTools: 'ද්‍රව්‍ය, මෙවලම් සහ උපකරණ',
     hazardsPpe: 'අනතුරු සහ අවශ්‍ය PPE',
-    steps: 'කෙටි මාර්ගෝපදේශය',
+    steps: 'ක්‍රියාපටිපාටි පියවර',
     flowchart: 'ක්‍රියාවලි ගැලීම් සටහන',
     tables: 'පිරිවිතර වගු',
     qualityChecks: 'තත්ත්ව පරීක්ෂා',

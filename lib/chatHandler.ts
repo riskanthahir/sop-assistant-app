@@ -183,6 +183,19 @@ export async function handleChatRequest(
   const question = typeof body.question === 'string' ? body.question.trim() : '';
   const previousQuestion =
     typeof body.previousQuestion === 'string' ? body.previousQuestion.trim() : '';
+  const rawHistory = Array.isArray(body.conversationHistory) ? body.conversationHistory : [];
+  const conversationHistory = rawHistory
+    .filter((entry) => entry && typeof entry === 'object')
+    .map((entry) => {
+      const rec = entry as Record<string, unknown>;
+      return {
+        question: typeof rec.question === 'string' ? rec.question.trim() : '',
+        title: typeof rec.title === 'string' ? rec.title.trim() : '',
+        summary: typeof rec.summary === 'string' ? rec.summary.trim() : '',
+      };
+    })
+    .filter((entry) => entry.question.length > 0)
+    .slice(-4);
   const rawLang = typeof body.language === 'string' ? body.language : 'en';
   const language: Language = rawLang === 'si' || rawLang === 'ta' ? rawLang : 'en';
   const includeDebug = body.includeDebug === true;
@@ -239,12 +252,26 @@ export async function handleChatRequest(
       return;
     }
 
-    // Combine very short follow-up questions with previous user question for retrieval context
+    const lastTurn = conversationHistory[conversationHistory.length - 1];
+    const anchorQuestion = lastTurn?.question || previousQuestion;
     const wordCount = question.split(/\s+/).filter(Boolean).length;
-    const isShortFollowUp = (question.length < 24 || wordCount <= 4) && previousQuestion.length > 0;
-    const retrievalQuery = isShortFollowUp
-      ? `${previousQuestion}\nFollow-up: ${question}`
+    const hasFollowUpCue = /\b(it|that|this|these|those|them|step\s*\d+|above|same|next|more|details|explain|how about|what about)\b/i.test(
+      question
+    );
+    const isFollowUp =
+      anchorQuestion.length > 0 && (question.length < 36 || wordCount <= 5 || hasFollowUpCue);
+    const retrievalQuery = isFollowUp
+      ? `${anchorQuestion}\nFollow-up: ${question}`
       : question;
+
+    const conversationContext = conversationHistory
+      .map((turn, idx) => {
+        const parts = [`Turn ${idx + 1} User: ${turn.question}`];
+        if (turn.title) parts.push(`Turn ${idx + 1} Answer Topic: ${turn.title}`);
+        if (turn.summary) parts.push(`Turn ${idx + 1} Summary: ${turn.summary}`);
+        return parts.join('\n');
+      })
+      .join('\n\n');
 
     const queryVector = await embedQueryText(retrievalQuery);
     const searchResult = searchSopChunks(store, retrievalQuery, queryVector, requestedMinScore);
@@ -277,10 +304,11 @@ export async function handleChatRequest(
     writeNdjson(res, { type: 'stage', stage: 'writing' });
 
     const { parsed, rawText } = await generateSopAnswer({
-      question: retrievalQuery,
+      question,
       language,
       chunks: searchResult.selected,
       glossary: store.glossary,
+      conversationContext,
     });
 
     const validatedAnswer = validateAndFinalizeAnswer(parsed, searchResult.selected);

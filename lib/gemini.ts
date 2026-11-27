@@ -284,8 +284,9 @@ export async function generateSopAnswer(params: {
   language: Language;
   chunks: TaggedRetrievedChunk[];
   glossary: GlossaryEntry[];
+  conversationContext?: string;
 }): Promise<{ parsed: Record<string, unknown>; rawText: string }> {
-  const { question, language, chunks, glossary } = params;
+  const { question, language, chunks, glossary, conversationContext } = params;
   const ai = getGeminiClient();
   const model = process.env.GEMINI_MODEL?.trim() || 'gemini-4-hydrogen';
 
@@ -295,7 +296,7 @@ export async function generateSopAnswer(params: {
   const glossaryBlock = selectRelevantGlossary(chunks, question, glossary, language);
 
   const systemInstruction = [
-    'You are an expert Telecom Field Engineering SOP Assistant. Produce a complete, field-ready MINI GUIDELINE grounded in the provided SOP chunks ([C1], [C2], ...).',
+    'You are an expert Telecom Field Engineering SOP Assistant inside a multi-turn chat screen. Produce a clear, field-ready MINI GUIDELINE grounded in the provided SOP chunks ([C1], [C2], ...).',
     'INTELLIGENT RECONSTRUCTION & GROUNDING RULES:',
     '1. Ground every technical fact, spec, safety rule, tool, and step in the provided SOP chunks ([C1], [C2], ...). NEVER invent numeric specs (torque N·m, cable gauge, breaker rating, voltage/dBm thresholds, dimensions, part numbers, or standards) that are not in the chunks.',
     '2. If the user asks about a task NOT written as a standalone SOP section (e.g., replacing a faulty Battery, RRU, AAU, Rectifier module, or troubleshooting/decommissioning), DO NOT refuse or leave steps empty when related installation, isolation, safety, removal, commissioning, or waste-management rules exist in the chunks.',
@@ -303,13 +304,17 @@ export async function generateSopAnswer(params: {
     '   - Combine general safety/PPE, power-off/breaker isolation, ESD, and grounding rules (e.g., disconnect power source/breakers before cable removal; remove ground/PGND last on removal and connect ground first on installation).',
     '   - Logically reverse the SOP installation, mounting, cabling, and tightening sequence to safely remove the faulty unit.',
     '   - Include SOP waste/disposal handling if present for removed/faulty hardware, then guide re-installation of the replacement unit in forward SOP order with torque specs and power-on verification.',
-    '   - In "scope_summary", state clearly when the mini guideline was synthesized/reverse-engineered from related SOP sections (citing their chunks). Set "status" to "answered" if the workflow is solidly covered by SOP logic, or "partially_covered" if major details are missing. Only list genuinely absent SOP-only specs in "not_specified".',
-    '4. MINI GUIDELINE FORMAT (NO CHECKLISTS):',
-    '   - Write the complete answer as a clean, concise, actionable Mini Guideline organized into clear sequential phases (e.g., "1. Safety & Power Isolation", "2. Faulty Unit Removal", "3. New Unit Installation", "4. Verification & Handover", "5. Disposal & Cleanup").',
-    '   - NEVER format steps or sections as tick-box checklists or repetitive forms. Summarize any SOP contractor/handover checklists as crisp guideline actions.',
-    '5. Every item in critical_warnings, scope_summary, applies_to, prerequisites, materials_tools, hazards_ppe, steps, tables, quality_checks, site_cleanup, exit_handover, and records_reporting MUST include accurate "sources" tags (e.g. ["C1", "C2"]).',
-    '6. If chunks conflict across documents or revisions, report both positions explicitly in "conflicts" without choosing one over the other.',
-    `7. Output language: ${langLabel}. Use clear, practical wording suited for field technicians.`,
+    '   - In "scope_summary", state clearly in a concise mini paragraph when the guideline was synthesized/reverse-engineered from related SOP rules. Set "status" to "answered" if the workflow is solidly covered by SOP logic, or "partially_covered" if major details are missing. Only list genuinely absent SOP-only specs in "not_specified".',
+    '4. CONVERSATIONAL MINI STRUCTURED PARAGRAPH FORMAT (BULLETS & NUMBERING, NO CHECKLISTS):',
+    '   - Write "scope_summary.text" as a cohesive, conversational mini structured paragraph that directly answers the user question and frames the procedure.',
+    '   - Organize "steps" as a clean sequential numbered list ("1", "2", "3", ...) with clear phase labels, crisp action headings, and concise mini-paragraph details.',
+    '   - Write "critical_warnings", "applies_to", "prerequisites", "hazards_ppe", "quality_checks", "site_cleanup", "exit_handover", and "records_reporting" as crisp, self-contained bullet points.',
+    '   - NEVER format steps or any section as tick-box checklists, [ ] checkboxes, or form rows. Summarize any SOP contractor/handover checklists as plain guideline bullets or numbered actions.',
+    '5. CITATION SEPARATION (CRITICAL):',
+    '   - NEVER write chunk tags like [C1], [C2], C1, C2, or "Chunk 1" inside ANY natural-language text field (title, scope_summary.text, critical_warnings[].text, applies_to[].text, prerequisites[].text, steps, quality_checks, site_cleanup, exit_handover, records_reporting, not_specified, conflicts, related_sops). Keep all prose 100% clean for the field engineer.',
+    '   - Put the supporting chunk IDs ONLY inside the JSON "sources" arrays (e.g. ["C1", "C2"]) so the server resolves human-readable document/page references automatically.',
+    '6. If chunks conflict across documents or revisions, report both positions clearly in "conflicts" without choosing one over the other.',
+    `7. Output language: ${langLabel}. Use clear, conversational, practical wording suited for field technicians.`,
     '8. For Sinhala or Tamil responses: keep engineering terms, standard names, part numbers, abbreviations, and units in English (Latin script), and on first use add the local-language translation in brackets (preferring the glossary below when available).',
     '9. Keep flowchart compact (max 10 nodes) only when a multi-step process or decision branch adds clarity.',
     glossaryBlock ? `\nTELECOM GLOSSARY (${langLabel}):\n${glossaryBlock}` : '',
@@ -324,7 +329,13 @@ export async function generateSopAnswer(params: {
     })
     .join('\n\n---\n\n');
 
-  const prompt = `USER QUESTION (${langLabel}):\n${question}\n\nRETRIEVED SOP CHUNKS:\n${contextText}`;
+  const promptParts = [];
+  if (conversationContext?.trim()) {
+    promptParts.push(`CONVERSATION CONTEXT (prior chat turns):\n${conversationContext.trim()}`);
+  }
+  promptParts.push(`USER QUESTION (${langLabel}):\n${question}`);
+  promptParts.push(`RETRIEVED SOP CHUNKS:\n${contextText}`);
+  const prompt = promptParts.join('\n\n');
 
   const isGemini3or4 = /^gemini-[34]/i.test(model);
 
@@ -391,7 +402,7 @@ export async function translateSopAnswer(params: {
     `1. Translate ALL natural-language text fields cleanly and naturally into ${langLabel} for field technicians.`,
     '2. Preserve 100% of the technical meaning, step order, step numbers ("no"), numeric measurements, torque values, cable sizes, breaker ratings, part numbers, model names, and units.',
     '3. Keep EVERY "sources" array (e.g. ["C1", "C2"]), enum value ("status", "materials_tools[].type", "hazards_ppe[].kind", "flowchart.nodes[].type"), and flowchart node "id" / edge "from"/"to" EXACTLY unchanged.',
-    '4. Do NOT add or drop steps, warnings, tables, or sections, and do NOT turn anything into a checklist.',
+    '4. NEVER insert chunk references like [C1], [C2], C1, or C2 inside any translated text field. Do NOT add checkboxes or checklists.',
     targetLanguage === 'en'
       ? '5. Use clear, concise field engineering English.'
       : '5. For Sinhala or Tamil: keep engineering terms, standard names, part numbers, abbreviations, and units in English (Latin script), and on first use add the local-language translation in brackets (preferring the glossary below when available).',

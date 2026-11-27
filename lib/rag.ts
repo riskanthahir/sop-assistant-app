@@ -451,13 +451,20 @@ export function validateAndFinalizeAnswer(
     return valid;
   };
 
+  const cleanProse = (text: string): string =>
+    text
+      .replace(/\s*\[(?:C\d+(?:\s*,\s*C\d+)*)\]/gi, '')
+      .replace(/\s*\((?:C\d+(?:\s*,\s*C\d+)*)\)/gi, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+
   const sanitizeSourcedTextList = (arr: unknown) => {
     if (!Array.isArray(arr)) return [];
     const out: Array<{ text: string; sources: string[] }> = [];
     for (const entry of arr) {
       if (!entry || typeof entry !== 'object') continue;
       const rec = entry as Record<string, unknown>;
-      const text = typeof rec.text === 'string' ? rec.text.trim() : '';
+      const text = typeof rec.text === 'string' ? cleanProse(rec.text) : '';
       const sources = filterSources(rec.sources);
       if (text && sources.length > 0) {
         out.push({ text, sources });
@@ -476,7 +483,7 @@ export function validateAndFinalizeAnswer(
   let scope_summary: StructuredAnswer['scope_summary'] = null;
   if (raw.scope_summary && typeof raw.scope_summary === 'object') {
     const ss = raw.scope_summary as Record<string, unknown>;
-    const text = typeof ss.text === 'string' ? ss.text.trim() : '';
+    const text = typeof ss.text === 'string' ? cleanProse(ss.text) : '';
     const sources = filterSources(ss.sources);
     if (text && sources.length > 0) {
       scope_summary = { text, sources };
@@ -488,8 +495,8 @@ export function validateAndFinalizeAnswer(
     for (const entry of raw.materials_tools) {
       if (!entry || typeof entry !== 'object') continue;
       const rec = entry as Record<string, unknown>;
-      const item = typeof rec.item === 'string' ? rec.item.trim() : '';
-      const spec_qty = typeof rec.spec_qty === 'string' ? rec.spec_qty.trim() : '';
+      const item = typeof rec.item === 'string' ? cleanProse(rec.item) : '';
+      const spec_qty = typeof rec.spec_qty === 'string' ? cleanProse(rec.spec_qty) : '';
       const rawType = typeof rec.type === 'string' ? rec.type : 'material';
       const type = (['material', 'tool', 'equipment', 'document'].includes(rawType)
         ? rawType
@@ -506,7 +513,7 @@ export function validateAndFinalizeAnswer(
     for (const entry of raw.hazards_ppe) {
       if (!entry || typeof entry !== 'object') continue;
       const rec = entry as Record<string, unknown>;
-      const item = typeof rec.item === 'string' ? rec.item.trim() : '';
+      const item = typeof rec.item === 'string' ? cleanProse(rec.item) : '';
       const kind = rec.kind === 'ppe' ? 'ppe' : 'hazard';
       const sources = filterSources(rec.sources);
       if (item && sources.length > 0) {
@@ -520,16 +527,16 @@ export function validateAndFinalizeAnswer(
     for (const entry of raw.steps) {
       if (!entry || typeof entry !== 'object') continue;
       const rec = entry as Record<string, unknown>;
-      const action = typeof rec.action === 'string' ? rec.action.trim() : '';
+      const action = typeof rec.action === 'string' ? cleanProse(rec.action) : '';
       const sources = filterSources(rec.sources);
       if (action && sources.length > 0) {
         steps.push({
           no: typeof rec.no === 'string' && rec.no.trim() ? rec.no.trim() : String(steps.length + 1),
-          phase: typeof rec.phase === 'string' ? rec.phase.trim() : '',
+          phase: typeof rec.phase === 'string' ? cleanProse(rec.phase) : '',
           action,
-          details: typeof rec.details === 'string' ? rec.details.trim() : '',
-          caution: typeof rec.caution === 'string' ? rec.caution.trim() : '',
-          check: typeof rec.check === 'string' ? rec.check.trim() : '',
+          details: typeof rec.details === 'string' ? cleanProse(rec.details) : '',
+          caution: typeof rec.caution === 'string' ? cleanProse(rec.caution) : '',
+          check: typeof rec.check === 'string' ? cleanProse(rec.check) : '',
           sources,
         });
       }
@@ -541,14 +548,14 @@ export function validateAndFinalizeAnswer(
     for (const entry of raw.tables) {
       if (!entry || typeof entry !== 'object') continue;
       const rec = entry as Record<string, unknown>;
-      const title = typeof rec.title === 'string' ? rec.title.trim() : '';
+      const title = typeof rec.title === 'string' ? cleanProse(rec.title) : '';
       const headers = Array.isArray(rec.headers)
-        ? rec.headers.map((h) => String(h ?? '').trim())
+        ? rec.headers.map((h) => cleanProse(String(h ?? '')))
         : [];
       const rows = Array.isArray(rec.rows)
         ? rec.rows
             .filter((r) => Array.isArray(r))
-            .map((r) => (r as unknown[]).map((c) => String(c ?? '').trim()))
+            .map((r) => (r as unknown[]).map((c) => cleanProse(String(c ?? ''))))
         : [];
       const sources = filterSources(rec.sources);
       if (headers.length > 0 && rows.length > 0 && sources.length > 0) {
@@ -562,8 +569,8 @@ export function validateAndFinalizeAnswer(
     for (const entry of raw.quality_checks) {
       if (!entry || typeof entry !== 'object') continue;
       const rec = entry as Record<string, unknown>;
-      const check = typeof rec.check === 'string' ? rec.check.trim() : '';
-      const criteria = typeof rec.criteria === 'string' ? rec.criteria.trim() : '';
+      const check = typeof rec.check === 'string' ? cleanProse(rec.check) : '';
+      const criteria = typeof rec.criteria === 'string' ? cleanProse(rec.criteria) : '';
       const sources = filterSources(rec.sources);
       if (check && sources.length > 0) {
         quality_checks.push({ check, criteria, sources });
@@ -586,7 +593,7 @@ export function validateAndFinalizeAnswer(
           : 'step') as 'start' | 'step' | 'decision' | 'end';
         return {
           id: String(rec.id ?? '').trim(),
-          label: String(rec.label ?? '').trim(),
+          label: cleanProse(String(rec.label ?? '')),
           type,
         };
       })
@@ -599,7 +606,7 @@ export function validateAndFinalizeAnswer(
         return {
           from: String(rec.from ?? '').trim(),
           to: String(rec.to ?? '').trim(),
-          label: String(rec.label ?? '').trim(),
+          label: cleanProse(String(rec.label ?? '')),
         };
       })
       .filter((e) => nodeIds.has(e.from) && nodeIds.has(e.to));
@@ -611,7 +618,7 @@ export function validateAndFinalizeAnswer(
 
   const toStringArray = (val: unknown): string[] =>
     Array.isArray(val)
-      ? val.map((v) => String(v ?? '').trim()).filter(Boolean)
+      ? val.map((v) => cleanProse(String(v ?? ''))).filter(Boolean)
       : [];
 
   const not_specified = toStringArray(raw.not_specified);

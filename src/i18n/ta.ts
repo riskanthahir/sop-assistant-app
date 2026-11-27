@@ -24,6 +24,9 @@ export const ta: UIStrings = {
   micStop: 'நிறுத்து',
   searchingStage: 'அங்கீகரிக்கப்பட்ட SOP ஆவணங்களைத் தேடுகிறது...',
   writingStage: 'சுருக்க வழிகாட்டியை உருவாக்குகிறது...',
+  newChat: 'புதிய உரையாடல்',
+  youLabel: 'நீங்கள்',
+  assistantLabel: 'SOP உதவியாளர்',
   examplesLabel: 'பொதுவான களக் கேள்விகள்',
   examples: [
     'பழுதான battery bank module ஐ எவ்வாறு பாதுகாப்பாக மாற்றுவது?',
@@ -50,7 +53,7 @@ export const ta: UIStrings = {
     prerequisites: 'முன்நிபந்தனைகள் & அனுமதிகள்',
     materialsTools: 'பொருட்கள், கருவிகள் & சாதனங்கள்',
     hazardsPpe: 'அபாயங்கள் & தேவையான PPE',
-    steps: 'சுருக்க வழிகாட்டி',
+    steps: 'செயல்முறை படிகள்',
     flowchart: 'செயல்முறை பாய்வுப் படம்',
     tables: 'விவரக்குறிப்பு அட்டவணைகள்',
     qualityChecks: 'தரம் & ஏற்புச் சோதனைகள்',

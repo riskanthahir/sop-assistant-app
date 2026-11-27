@@ -61,9 +61,13 @@ export default function App() {
   });
 
   const [history, setHistory] = useState<SavedQA[]>(() => loadSavedHistory());
-  const [activeQA, setActiveQA] = useState<SavedQA | null>(() =>
-    typeof navigator !== 'undefined' && !navigator.onLine ? loadSavedHistory()[0] || null : null
-  );
+  const [thread, setThread] = useState<SavedQA[]>(() => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      const first = loadSavedHistory()[0];
+      return first ? [first] : [];
+    }
+    return [];
+  });
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const [status, setStatus] = useState<AppStatusResponse | null>(null);
@@ -142,7 +146,15 @@ export default function App() {
   };
 
   const handleSaveQA = (qa: SavedQA) => {
-    setActiveQA(qa);
+    setThread((prev) => {
+      const idx = prev.findIndex((item) => item.id === qa.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = qa;
+        return next;
+      }
+      return [...prev, qa];
+    });
     setHistory((prev) => {
       const next = [qa, ...prev.filter((item) => item.id !== qa.id)].slice(0, 20);
       try {
@@ -154,9 +166,13 @@ export default function App() {
     });
   };
 
+  const handleNewChat = () => {
+    setThread([]);
+  };
+
   const handleClearHistory = () => {
     setHistory([]);
-    setActiveQA(null);
+    setThread([]);
     try {
       localStorage.removeItem(HISTORY_STORAGE_KEY);
     } catch {
@@ -209,9 +225,9 @@ export default function App() {
           reportUrl={status?.reportUrl ?? ''}
           isOnline={isOnline}
           dark={dark}
-          activeQA={activeQA}
-          lastQuestion={activeQA?.question || ''}
+          thread={thread}
           onSaveQA={handleSaveQA}
+          onNewChat={handleNewChat}
           onUnauthorized={handleLock}
           t={t}
         />
@@ -222,7 +238,7 @@ export default function App() {
         onClose={() => setHistoryOpen(false)}
         items={history}
         onSelect={(item) => {
-          setActiveQA(item);
+          setThread((prev) => (prev.some((x) => x.id === item.id) ? prev : [item]));
           navigate('chat');
         }}
         onClear={handleClearHistory}

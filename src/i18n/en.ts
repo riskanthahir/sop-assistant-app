@@ -22,6 +22,9 @@ export interface UIStrings {
   micStop: string;
   searchingStage: string;
   writingStage: string;
+  newChat: string;
+  youLabel: string;
+  assistantLabel: string;
   examplesLabel: string;
   examples: string[];
   quickView: string;
@@ -119,7 +122,10 @@ export const en: UIStrings = {
   micStart: 'Speak question',
   micStop: 'Stop listening',
   searchingStage: 'Searching approved SOP documents...',
-  writingStage: 'Building mini guideline...',
+  writingStage: 'Writing mini guideline...',
+  newChat: 'New chat',
+  youLabel: 'You',
+  assistantLabel: 'SOP Assistant',
   examplesLabel: 'Common field questions',
   examples: [
     'How do I safely replace a faulty battery bank module?',
@@ -146,7 +152,7 @@ export const en: UIStrings = {
     prerequisites: 'Prerequisites & Permits',
     materialsTools: 'Materials, Tools & Equipment',
     hazardsPpe: 'Hazards & Required PPE',
-    steps: 'Mini Guideline',
+    steps: 'Procedure Steps',
     flowchart: 'Process Flowchart',
     tables: 'Specification Tables',
     qualityChecks: 'Quality & Acceptance Checks',
