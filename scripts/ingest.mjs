@@ -275,11 +275,18 @@ async function extractPdfPages(pdfPath) {
 
         pages.push({ pageNum, lines: taggedLines, charCount });
       } finally {
-        page.cleanup();
+        if (typeof page.cleanup === 'function') {
+          page.cleanup();
+        }
       }
     }
   } finally {
-    await pdfDoc.destroy();
+    if (typeof pdfDoc.cleanup === 'function') {
+      await pdfDoc.cleanup();
+    }
+    if (typeof loadingTask.destroy === 'function') {
+      await loadingTask.destroy();
+    }
   }
 
   return { pageCount, pages, lowTextPages, headingsFound };
@@ -737,6 +744,7 @@ async function main() {
           error: `Quota reached at ${partial?.embeddings?.length || 0}/${partial?.chunks?.length || '?'} chunks. Partial progress saved; re-run to resume.`,
         });
       } else {
+        console.error(`Error processing ${relPath}:`, err);
         reportRows.push({
           file: relPath,
           docTitle,
