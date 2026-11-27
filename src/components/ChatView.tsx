@@ -75,6 +75,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [showScrollBottom, setShowScrollBottom] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const answerStartRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const pendingScrollAnswerIdRef = useRef<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -83,7 +85,19 @@ export const ChatView: React.FC<ChatViewProps> = ({
   };
 
   useEffect(() => {
-    if (thread.length > 0 || pendingQuestion || loadingStage) {
+    const targetAnswerId = pendingScrollAnswerIdRef.current;
+    if (targetAnswerId) {
+      const targetEl = answerStartRefs.current.get(targetAnswerId);
+      if (targetEl) {
+        const timer = setTimeout(() => {
+          pendingScrollAnswerIdRef.current = null;
+          targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 80);
+        return () => clearTimeout(timer);
+      }
+    }
+
+    if (pendingQuestion || loadingStage) {
       const timer = setTimeout(() => scrollToBottom('smooth'), 60);
       return () => clearTimeout(timer);
     }
@@ -281,6 +295,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             createdAt: new Date().toISOString(),
             answer: event.answer,
           };
+          pendingScrollAnswerIdRef.current = saved.id;
           setPendingQuestion(null);
           setAnswerLangById((prev) => ({ ...prev, [saved.id]: language }));
           onSaveQA(saved);
@@ -504,7 +519,16 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   </div>
 
                   {/* Assistant message bubble */}
-                  <div className="flex items-start gap-2 sm:gap-3">
+                  <div
+                    ref={(el) => {
+                      if (el) {
+                        answerStartRefs.current.set(qa.id, el);
+                      } else {
+                        answerStartRefs.current.delete(qa.id);
+                      }
+                    }}
+                    className="flex items-start gap-2 sm:gap-3 scroll-mt-[72px]"
+                  >
                     <div
                       aria-hidden="true"
                       className="hidden sm:flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 mt-0.5"
