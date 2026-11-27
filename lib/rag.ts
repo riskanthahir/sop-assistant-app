@@ -426,6 +426,27 @@ export function buildNotCoveredAnswer(title: string, reason: string): Structured
   };
 }
 
+export function stripChunkRefs(text: string): string {
+  const sep = '(?:\\s*(?:,\\s*(?:and|or)?|;|\\/|&|\\band\\b|\\bor\\b|\\bto\\b|–|—|-)\\s*)';
+  const cTag = 'C\\d{1,2}';
+  const cList = `${cTag}(?:${sep}(?:chunks?\\s*)?${cTag})*`;
+  const cMulti = `${cTag}(?:${sep}(?:chunks?\\s*)?${cTag})+`;
+  const leadPrep = '(?:(?:based\\s+on|from|in|per|see|using|ref)\\s+)?';
+
+  return text
+    .replace(new RegExp(`\\s*[\\[(]\\s*${leadPrep}(?:chunks?\\s*:?\\s*)?${cList}\\s*[\\])]`, 'gi'), '')
+    .replace(new RegExp(`\\b${leadPrep}(?:chunks?\\s+)${cList}\\b`, 'gi'), '')
+    .replace(new RegExp(`\\b${leadPrep}${cMulti}\\b`, 'gi'), '')
+    .replace(/\b(?:based\s+on|from|per|see|ref)\s+C(?:[1-9]|1\d|2\d)\b/gi, '')
+    .replace(/\s+\bC(?:[1-9]|1\d|2\d)\b(?=\s*[.,;:]|\s*$)/g, '')
+    .replace(/\(\s*[,;:\-–—]*\s*\)/g, '')
+    .replace(/\[\s*[,;:\-–—]*\s*\]/g, '')
+    .replace(/\s+([.,;:!?])/g, '$1')
+    .replace(/([.,;:])\s*,+/g, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 export function validateAndFinalizeAnswer(
   raw: Record<string, unknown>,
   retrieved: TaggedRetrievedChunk[]
@@ -451,12 +472,7 @@ export function validateAndFinalizeAnswer(
     return valid;
   };
 
-  const cleanProse = (text: string): string =>
-    text
-      .replace(/\s*\[(?:C\d+(?:\s*,\s*C\d+)*)\]/gi, '')
-      .replace(/\s*\((?:C\d+(?:\s*,\s*C\d+)*)\)/gi, '')
-      .replace(/\s{2,}/g, ' ')
-      .trim();
+  const cleanProse = stripChunkRefs;
 
   const sanitizeSourcedTextList = (arr: unknown) => {
     if (!Array.isArray(arr)) return [];
@@ -624,6 +640,7 @@ export function validateAndFinalizeAnswer(
   const not_specified = toStringArray(raw.not_specified);
   const conflicts = toStringArray(raw.conflicts);
   const related_sops = toStringArray(raw.related_sops);
+  const follow_ups = toStringArray(raw.follow_ups).slice(0, 3);
 
   // Build server-authoritative references strictly from cited retrieved chunks
   const refMap = new Map<string, AnswerReference>();
@@ -676,7 +693,10 @@ export function validateAndFinalizeAnswer(
 
   return {
     status,
-    title: typeof raw.title === 'string' && raw.title.trim() ? raw.title.trim() : 'SOP Procedure',
+    title:
+      typeof raw.title === 'string' && cleanProse(raw.title)
+        ? cleanProse(raw.title)
+        : 'SOP Procedure',
     critical_warnings,
     scope_summary,
     applies_to,
@@ -693,6 +713,7 @@ export function validateAndFinalizeAnswer(
     not_specified,
     conflicts,
     related_sops,
+    ...(follow_ups.length > 0 ? { follow_ups } : {}),
     references: hasGroundedContent ? Array.from(refMap.values()) : [],
   };
 }

@@ -9,10 +9,10 @@ export const TRANSLATIONS: Record<Language, UIStrings> = {
   ta,
 };
 
-export const LANGUAGE_OPTIONS: Array<{ code: Language; label: string }> = [
-  { code: 'en', label: 'EN' },
-  { code: 'si', label: 'සිංහල' },
-  { code: 'ta', label: 'தமிழ்' },
+export const LANGUAGE_OPTIONS: Array<{ code: Language; label: string; shortLabel: string }> = [
+  { code: 'en', label: 'EN', shortLabel: 'E' },
+  { code: 'si', label: 'සිංහල', shortLabel: 'සි' },
+  { code: 'ta', label: 'தமிழ்', shortLabel: 'த' },
 ];
 
 export const SAFETY_FOOTER_ALL_LANGUAGES = [

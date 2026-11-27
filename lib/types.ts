@@ -135,6 +135,7 @@ export interface StructuredAnswer {
   not_specified: string[];
   conflicts: string[];
   related_sops: string[];
+  follow_ups?: string[];
   references: AnswerReference[];
 }
 

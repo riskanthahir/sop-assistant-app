@@ -22,9 +22,17 @@ export interface UIStrings {
   micStop: string;
   searchingStage: string;
   writingStage: string;
+  searchingStages: string[];
+  writingStages: string[];
+  heroFeatures: Array<{ title: string; subtitle: string }>;
   newChat: string;
   youLabel: string;
   assistantLabel: string;
+  stopGenerating: string;
+  followUpsLabel: string;
+  askAboutStep: string;
+  regenerate: string;
+  scrollToBottom: string;
   examplesLabel: string;
   examples: string[];
   quickView: string;
@@ -123,9 +131,31 @@ export const en: UIStrings = {
   micStop: 'Stop listening',
   searchingStage: 'Searching approved SOP documents...',
   writingStage: 'Writing mini guideline...',
+  searchingStages: [
+    'Scanning approved Huawei SOP chapters...',
+    'Checking safety, PPE & isolation rules...',
+    'Cross-referencing specs & torque tables...',
+    'Gathering grounding & installation steps...',
+  ],
+  writingStages: [
+    'Reconstructing field-ready sequence...',
+    'Organizing numbered procedure steps...',
+    'Verifying cautions & acceptance checks...',
+    'Finalizing SOP document references...',
+  ],
+  heroFeatures: [
+    { title: 'SOP Grounded', subtitle: 'Answers backed by approved docs' },
+    { title: 'Field Ready', subtitle: 'Step-by-step mini guidelines' },
+    { title: '3 Languages', subtitle: 'English, සිංහල & தமிழ்' },
+  ],
   newChat: 'New chat',
   youLabel: 'You',
   assistantLabel: 'SOP Assistant',
+  stopGenerating: 'Stop',
+  followUpsLabel: 'Ask a follow-up',
+  askAboutStep: 'Ask about this step',
+  regenerate: 'Regenerate',
+  scrollToBottom: 'Latest reply',
   examplesLabel: 'Common field questions',
   examples: [
     'How do I safely replace a faulty battery bank module?',

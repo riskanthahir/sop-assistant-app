@@ -21,7 +21,7 @@
   },
   "rewrites": [
     {
-      "source": "/((?!api/|assets/|sw\\.js|workbox-|manifest\\.webmanifest|.*\\.(?:png|svg|ico|json|js|css|woff2?|txt|webmanifest)$).*)",
+      "source": "/((?!api/|assets/|sw\\.js|workbox-|manifest\\.webmanifest|.*\\.(?:png|jpe?g|svg|ico|json|js|mjs|css|map|webp|woff2?|txt|webmanifest)$).*)",
       "destination": "/index.html"
     }
   ]

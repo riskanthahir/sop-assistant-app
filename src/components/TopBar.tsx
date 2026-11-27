@@ -6,10 +6,12 @@ import {
   Lock,
   MessageSquare,
   Moon,
+  Radio,
   Share,
   Sun,
 } from 'lucide-react';
 import { usePWAInstall } from '../hooks/usePWAInstall';
+import { LANGUAGE_OPTIONS } from '../i18n';
 import type { UIStrings } from '../i18n/en';
 import type { Language } from '../types';
 
@@ -29,11 +31,6 @@ interface TopBarProps {
   t: UIStrings;
 }
 
-const LANG_OPTIONS: Array<{ code: Language; label: string }> = [
-  { code: 'en', label: 'EN' },
-  { code: 'si', label: 'සිංහල' },
-  { code: 'ta', label: 'தமிழ்' },
-];
 
 export const TopBar: React.FC<TopBarProps> = ({
   appName,
@@ -55,51 +52,56 @@ export const TopBar: React.FC<TopBarProps> = ({
 
   return (
     <>
-      <header className="sticky top-0 z-30 pt-safe border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md">
+      <header className="sticky top-0 z-40 w-full pt-safe border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-2xs">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-2 px-3 sm:px-6">
-          {/* Brand title */}
+          {/* Brand icon only */}
           <button
             type="button"
             onClick={() => onNavigate('chat')}
-            className="text-left font-display text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100 whitespace-nowrap shrink-0 min-h-[44px] flex items-center"
+            aria-label={appName}
+            title={appName}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-600 text-white shadow-xs hover:bg-sky-700 transition-colors"
           >
-            {appName}
+            <Radio className="h-5 w-5" />
           </button>
 
-          {/* Language Switcher */}
+          {/* Independent circular first-letter language buttons */}
           <div
             role="group"
             aria-label="Language"
-            className="flex items-center rounded-lg bg-slate-100 dark:bg-slate-800 p-0.5 shrink-0"
+            className="flex items-center gap-1.5 shrink-0"
           >
-            {LANG_OPTIONS.map((opt) => {
+            {LANGUAGE_OPTIONS.map((opt) => {
               const active = language === opt.code;
               return (
                 <button
                   key={opt.code}
                   type="button"
                   onClick={() => onLanguageChange(opt.code)}
-                  className={`px-2 sm:px-2.5 min-h-[36px] rounded-md text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
+                  aria-label={opt.label}
+                  title={opt.label}
+                  aria-pressed={active}
+                  className={`inline-flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full text-xs font-bold leading-none shrink-0 border transition-colors ${
                     active
-                      ? 'bg-white dark:bg-slate-950 text-sky-700 dark:text-sky-400 shadow-xs'
-                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                      ? 'border-sky-600 bg-sky-600 text-white shadow-xs dark:border-sky-500 dark:bg-sky-500'
+                      : 'border-slate-200 dark:border-slate-700 bg-slate-100/80 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:border-sky-400 hover:text-sky-700 dark:hover:text-sky-300'
                   }`}
                 >
-                  {opt.label}
+                  {opt.shortLabel}
                 </button>
               );
             })}
           </div>
 
           {/* Right actions */}
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
             {!isInstalled && isInstallable && (
               <button
                 type="button"
                 onClick={() => void install()}
                 aria-label={t.installButton}
                 title={t.installButton}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white px-2.5 min-h-[40px] text-xs font-medium whitespace-nowrap shrink-0 transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white px-2 sm:px-2.5 min-h-[38px] sm:min-h-[40px] text-xs font-medium whitespace-nowrap shrink-0 transition-colors"
               >
                 <Download className="h-4 w-4" />
                 <span className="hidden sm:inline">{t.installButton}</span>
@@ -112,7 +114,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                 onClick={() => setShowIOSModal(true)}
                 aria-label={t.installIosButton}
                 title={t.installIosButton}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 dark:border-slate-700 px-2.5 min-h-[40px] text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 whitespace-nowrap shrink-0"
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 dark:border-slate-700 px-2 sm:px-2.5 min-h-[38px] sm:min-h-[40px] text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 whitespace-nowrap shrink-0"
               >
                 <Download className="h-4 w-4" />
                 <span className="hidden sm:inline">{t.installIosButton}</span>
@@ -125,9 +127,9 @@ export const TopBar: React.FC<TopBarProps> = ({
                 onClick={onOpenHistory}
                 aria-label={t.historyButton}
                 title={t.historyButton}
-                className="relative inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="relative inline-flex items-center justify-center min-h-[40px] min-w-[38px] sm:min-h-[44px] sm:min-w-[44px] rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
-                <History className="h-5 w-5" />
+                <History className="h-[18px] w-[18px] sm:h-5 sm:w-5" />
                 {historyCount > 0 && (
                   <span className="sr-only">({historyCount})</span>
                 )}
@@ -138,9 +140,13 @@ export const TopBar: React.FC<TopBarProps> = ({
               type="button"
               onClick={onToggleDark}
               aria-label={dark ? 'Light mode' : 'Dark mode'}
-              className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="inline-flex items-center justify-center min-h-[40px] min-w-[38px] sm:min-h-[44px] sm:min-w-[44px] rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             >
-              {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+              {dark ? (
+                <Sun className="h-[18px] w-[18px] sm:h-5 sm:w-5" />
+              ) : (
+                <Moon className="h-[18px] w-[18px] sm:h-5 sm:w-5" />
+              )}
             </button>
 
             {isUnlocked && (
@@ -149,16 +155,16 @@ export const TopBar: React.FC<TopBarProps> = ({
                 onClick={() => onNavigate(route === 'debug' ? 'chat' : 'debug')}
                 aria-label={route === 'debug' ? t.navChat : t.navDebug}
                 title={route === 'debug' ? t.navChat : t.navDebug}
-                className={`inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg transition-colors ${
+                className={`inline-flex items-center justify-center min-h-[40px] min-w-[38px] sm:min-h-[44px] sm:min-w-[44px] rounded-lg transition-colors ${
                   route === 'debug'
                     ? 'bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-400'
                     : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
               >
                 {route === 'debug' ? (
-                  <MessageSquare className="h-5 w-5" />
+                  <MessageSquare className="h-[18px] w-[18px] sm:h-5 sm:w-5" />
                 ) : (
-                  <Bug className="h-5 w-5" />
+                  <Bug className="h-[18px] w-[18px] sm:h-5 sm:w-5" />
                 )}
               </button>
             )}

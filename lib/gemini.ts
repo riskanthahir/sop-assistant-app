@@ -1,5 +1,5 @@
 import { GoogleGenAI, ThinkingLevel, Type, type Schema } from '@google/genai';
-import type { TaggedRetrievedChunk } from './rag.ts';
+import { stripChunkRefs, type TaggedRetrievedChunk } from './rag.ts';
 import type { GlossaryEntry, Language, StructuredAnswer } from './types.ts';
 
 const EMBED_DIM = 768;
@@ -226,6 +226,11 @@ const ANSWER_SCHEMA: Schema = {
       type: Type.ARRAY,
       items: { type: Type.STRING },
     },
+    follow_ups: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+      description: '2 to 3 short, practical follow-up questions the engineer might ask next.',
+    },
   },
   required: [
     'status',
@@ -244,6 +249,7 @@ const ANSWER_SCHEMA: Schema = {
     'not_specified',
     'conflicts',
     'related_sops',
+    'follow_ups',
   ],
 };
 
@@ -310,13 +316,14 @@ export async function generateSopAnswer(params: {
     '   - Organize "steps" as a clean sequential numbered list ("1", "2", "3", ...) with clear phase labels, crisp action headings, and concise mini-paragraph details.',
     '   - Write "critical_warnings", "applies_to", "prerequisites", "hazards_ppe", "quality_checks", "site_cleanup", "exit_handover", and "records_reporting" as crisp, self-contained bullet points.',
     '   - NEVER format steps or any section as tick-box checklists, [ ] checkboxes, or form rows. Summarize any SOP contractor/handover checklists as plain guideline bullets or numbered actions.',
-    '5. CITATION SEPARATION (CRITICAL):',
-    '   - NEVER write chunk tags like [C1], [C2], C1, C2, or "Chunk 1" inside ANY natural-language text field (title, scope_summary.text, critical_warnings[].text, applies_to[].text, prerequisites[].text, steps, quality_checks, site_cleanup, exit_handover, records_reporting, not_specified, conflicts, related_sops). Keep all prose 100% clean for the field engineer.',
-    '   - Put the supporting chunk IDs ONLY inside the JSON "sources" arrays (e.g. ["C1", "C2"]) so the server resolves human-readable document/page references automatically.',
+    '5. CITATION SEPARATION (CRITICAL — ZERO CHUNK TAGS IN TEXT):',
+    '   - NEVER write chunk tags like C1, C2, C3, [C1], (C1, C2), "Chunk 1", or "chunks C1–C3" inside ANY text field (title, scope_summary.text, critical_warnings[].text, applies_to[].text, prerequisites[].text, materials_tools, hazards_ppe, steps, tables, quality_checks, site_cleanup, exit_handover, records_reporting, not_specified, conflicts, related_sops, follow_ups).',
+    '   - Put the supporting chunk IDs ONLY inside the JSON "sources" arrays (e.g. ["C1", "C2"]) so the server resolves real document and page references automatically.',
     '6. If chunks conflict across documents or revisions, report both positions clearly in "conflicts" without choosing one over the other.',
     `7. Output language: ${langLabel}. Use clear, conversational, practical wording suited for field technicians.`,
     '8. For Sinhala or Tamil responses: keep engineering terms, standard names, part numbers, abbreviations, and units in English (Latin script), and on first use add the local-language translation in brackets (preferring the glossary below when available).',
     '9. Keep flowchart compact (max 10 nodes) only when a multi-step process or decision branch adds clarity.',
+    '10. In "follow_ups", provide 2 to 3 brief, practical next questions a technician would ask about this procedure (e.g. torque specs, grounding checks, disposal, or step details) in the output language.',
     glossaryBlock ? `\nTELECOM GLOSSARY (${langLabel}):\n${glossaryBlock}` : '',
   ]
     .filter(Boolean)
@@ -465,7 +472,7 @@ export async function translateSopAnswer(params: {
       .map((entry, idx) => {
         if (!entry || typeof entry !== 'object') return null;
         const rec = entry as Record<string, unknown>;
-        const text = typeof rec.text === 'string' ? rec.text.trim() : '';
+        const text = typeof rec.text === 'string' ? stripChunkRefs(rec.text) : '';
         if (!text) return null;
         return {
           text,
@@ -477,7 +484,7 @@ export async function translateSopAnswer(params: {
 
   const toStringList = (candidate: unknown, fallback: string[]): string[] =>
     Array.isArray(candidate)
-      ? candidate.map((v) => String(v ?? '').trim()).filter(Boolean)
+      ? candidate.map((v) => stripChunkRefs(String(v ?? ''))).filter(Boolean)
       : fallback;
 
   const translatedScope =
@@ -485,9 +492,9 @@ export async function translateSopAnswer(params: {
       ? {
           text:
             typeof (parsed.scope_summary as Record<string, unknown>).text === 'string' &&
-            String((parsed.scope_summary as Record<string, unknown>).text).trim()
-              ? String((parsed.scope_summary as Record<string, unknown>).text).trim()
-              : answer.scope_summary.text,
+            stripChunkRefs(String((parsed.scope_summary as Record<string, unknown>).text))
+              ? stripChunkRefs(String((parsed.scope_summary as Record<string, unknown>).text))
+              : stripChunkRefs(answer.scope_summary.text),
           sources: pickSources(
             (parsed.scope_summary as Record<string, unknown>).sources,
             answer.scope_summary.sources
@@ -502,12 +509,12 @@ export async function translateSopAnswer(params: {
             if (!entry || typeof entry !== 'object') return null;
             const rec = entry as Record<string, unknown>;
             const orig = answer.materials_tools[idx];
-            const item = typeof rec.item === 'string' ? rec.item.trim() : '';
+            const item = typeof rec.item === 'string' ? stripChunkRefs(rec.item) : '';
             if (!item) return null;
             return {
               item,
               spec_qty:
-                typeof rec.spec_qty === 'string' ? rec.spec_qty.trim() : orig?.spec_qty || '',
+                typeof rec.spec_qty === 'string' ? stripChunkRefs(rec.spec_qty) : orig?.spec_qty || '',
               type: orig?.type || 'material',
               sources: pickSources(rec.sources, orig?.sources || []),
             };
@@ -522,7 +529,7 @@ export async function translateSopAnswer(params: {
             if (!entry || typeof entry !== 'object') return null;
             const rec = entry as Record<string, unknown>;
             const orig = answer.hazards_ppe[idx];
-            const item = typeof rec.item === 'string' ? rec.item.trim() : '';
+            const item = typeof rec.item === 'string' ? stripChunkRefs(rec.item) : '';
             if (!item) return null;
             return {
               item,
@@ -540,15 +547,15 @@ export async function translateSopAnswer(params: {
             if (!entry || typeof entry !== 'object') return null;
             const rec = entry as Record<string, unknown>;
             const orig = answer.steps[idx];
-            const action = typeof rec.action === 'string' ? rec.action.trim() : '';
+            const action = typeof rec.action === 'string' ? stripChunkRefs(rec.action) : '';
             if (!action) return null;
             return {
               no: orig?.no || (typeof rec.no === 'string' && rec.no.trim() ? rec.no.trim() : String(idx + 1)),
-              phase: typeof rec.phase === 'string' ? rec.phase.trim() : orig?.phase || '',
+              phase: typeof rec.phase === 'string' ? stripChunkRefs(rec.phase) : orig?.phase || '',
               action,
-              details: typeof rec.details === 'string' ? rec.details.trim() : orig?.details || '',
-              caution: typeof rec.caution === 'string' ? rec.caution.trim() : '',
-              check: typeof rec.check === 'string' ? rec.check.trim() : '',
+              details: typeof rec.details === 'string' ? stripChunkRefs(rec.details) : orig?.details || '',
+              caution: typeof rec.caution === 'string' ? stripChunkRefs(rec.caution) : '',
+              check: typeof rec.check === 'string' ? stripChunkRefs(rec.check) : '',
               sources: pickSources(rec.sources, orig?.sources || []),
             };
           })
@@ -563,16 +570,16 @@ export async function translateSopAnswer(params: {
             const rec = entry as Record<string, unknown>;
             const orig = answer.tables[idx];
             const headers = Array.isArray(rec.headers)
-              ? rec.headers.map((h) => String(h ?? '').trim())
+              ? rec.headers.map((h) => stripChunkRefs(String(h ?? '')))
               : orig?.headers || [];
             const rows = Array.isArray(rec.rows)
               ? rec.rows
                   .filter((r) => Array.isArray(r))
-                  .map((r) => (r as unknown[]).map((c) => String(c ?? '').trim()))
+                  .map((r) => (r as unknown[]).map((c) => stripChunkRefs(String(c ?? ''))))
               : orig?.rows || [];
             if (headers.length === 0 || rows.length === 0) return orig || null;
             return {
-              title: typeof rec.title === 'string' ? rec.title.trim() : orig?.title || '',
+              title: typeof rec.title === 'string' ? stripChunkRefs(rec.title) : orig?.title || '',
               headers,
               rows,
               sources: pickSources(rec.sources, orig?.sources || []),
@@ -588,12 +595,12 @@ export async function translateSopAnswer(params: {
             if (!entry || typeof entry !== 'object') return null;
             const rec = entry as Record<string, unknown>;
             const orig = answer.quality_checks[idx];
-            const check = typeof rec.check === 'string' ? rec.check.trim() : '';
+            const check = typeof rec.check === 'string' ? stripChunkRefs(rec.check) : '';
             if (!check) return null;
             return {
               check,
               criteria:
-                typeof rec.criteria === 'string' ? rec.criteria.trim() : orig?.criteria || '',
+                typeof rec.criteria === 'string' ? stripChunkRefs(rec.criteria) : orig?.criteria || '',
               sources: pickSources(rec.sources, orig?.sources || []),
             };
           })
@@ -612,7 +619,7 @@ export async function translateSopAnswer(params: {
         const origNode = answer.flowchart?.nodes[idx];
         return {
           id: String(rec.id ?? origNode?.id ?? '').trim(),
-          label: String(rec.label ?? origNode?.label ?? '').trim(),
+          label: stripChunkRefs(String(rec.label ?? origNode?.label ?? '')),
           type: origNode?.type || 'step',
         };
       })
@@ -625,7 +632,7 @@ export async function translateSopAnswer(params: {
         return {
           from: String(rec.from ?? '').trim(),
           to: String(rec.to ?? '').trim(),
-          label: String(rec.label ?? '').trim(),
+          label: stripChunkRefs(String(rec.label ?? '')),
         };
       })
       .filter((e) => nodeIds.has(e.from) && nodeIds.has(e.to));
@@ -634,10 +641,14 @@ export async function translateSopAnswer(params: {
     }
   }
 
+  const translatedFollowUps = toStringList(parsed.follow_ups, answer.follow_ups || []).slice(0, 3);
+
   return {
     status: answer.status,
     title:
-      typeof parsed.title === 'string' && parsed.title.trim() ? parsed.title.trim() : answer.title,
+      typeof parsed.title === 'string' && stripChunkRefs(parsed.title)
+        ? stripChunkRefs(parsed.title)
+        : stripChunkRefs(answer.title),
     critical_warnings: mergeSourcedList(parsed.critical_warnings, answer.critical_warnings),
     scope_summary: translatedScope,
     applies_to: mergeSourcedList(parsed.applies_to, answer.applies_to),
@@ -654,6 +665,7 @@ export async function translateSopAnswer(params: {
     not_specified: toStringList(parsed.not_specified, answer.not_specified),
     conflicts: toStringList(parsed.conflicts, answer.conflicts),
     related_sops: toStringList(parsed.related_sops, answer.related_sops),
+    ...(translatedFollowUps.length > 0 ? { follow_ups: translatedFollowUps } : {}),
     references: originalRefs,
   };
 }

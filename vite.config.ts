@@ -57,7 +57,13 @@ export default defineConfig(() => {
           globIgnores: ['**/elk*.js', '**/mermaid*.js', '**/cytoscape*.js', '**/katex*.js'],
           maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
           navigateFallback: '/index.html',
-          navigateFallbackDenylist: [/^\/api\//],
+          navigateFallbackDenylist: [
+            /^\/api\//,
+            /^\/assets\//,
+            /^\/@/,
+            /^\/node_modules\//,
+            /\.(?:js|mjs|cjs|css|map|json|webmanifest|png|jpe?g|gif|svg|ico|webp|woff2?|ttf|eot)$/i,
+          ],
           cleanupOutdatedCaches: true,
           runtimeCaching: [
             {
@@ -92,8 +98,7 @@ export default defineConfig(() => {
           ],
         },
         devOptions: {
-          enabled: true,
-          type: 'module',
+          enabled: false,
         },
       }),
       {
