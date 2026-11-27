@@ -1,13 +1,13 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { checkRateLimit, getClientIp, isAccessConfigured, verifyAccessCode } from './auth.ts';
-import { embedQueryText, generateSopAnswer } from './gemini.ts';
+import { embedQueryText, generateSopAnswer, translateSopAnswer } from './gemini.ts';
 import {
   buildNotCoveredAnswer,
   getSopStore,
   searchSopChunks,
   validateAndFinalizeAnswer,
 } from './rag.ts';
-import type { AppStatusResponse, ChatStreamEvent, Language } from './types.ts';
+import type { AppStatusResponse, ChatStreamEvent, Language, StructuredAnswer } from './types.ts';
 
 function readJsonBody(req: IncomingMessage & { body?: unknown }): Promise<Record<string, unknown>> {
   if (req.body && typeof req.body === 'object') {
@@ -18,7 +18,7 @@ function readJsonBody(req: IncomingMessage & { body?: unknown }): Promise<Record
     let total = 0;
     req.on('data', (chunk: Buffer) => {
       total += chunk.length;
-      if (total > 256_000) {
+      if (total > 512_000) {
         reject(new Error('Request body too large'));
         return;
       }
@@ -313,5 +313,68 @@ export async function handleChatRequest(
       error: msg,
     });
     res.end();
+  }
+}
+
+export async function handleTranslateRequest(
+  req: IncomingMessage & { body?: unknown },
+  res: ServerResponse
+): Promise<void> {
+  if (req.method !== 'POST') {
+    sendJson(res, 405, { error: 'Method not allowed' });
+    return;
+  }
+
+  const access = verifyAccessCode(req.headers['x-access-code']);
+  if (!access.ok) {
+    sendJson(res, access.statusCode, { error: access.message });
+    return;
+  }
+
+  const ip = getClientIp(req);
+  const rate = checkRateLimit(ip);
+  if (!rate.allowed) {
+    res.setHeader('Retry-After', String(rate.retryAfterSec || 60));
+    sendJson(res, 429, { error: 'Rate limit exceeded. Please wait briefly before translating.' });
+    return;
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = await readJsonBody(req);
+  } catch (err) {
+    sendJson(res, 400, { error: (err as Error).message });
+    return;
+  }
+
+  const rawLang = typeof body.targetLanguage === 'string' ? body.targetLanguage : '';
+  if (rawLang !== 'en' && rawLang !== 'si' && rawLang !== 'ta') {
+    sendJson(res, 400, { error: 'Invalid targetLanguage (expected en, si, or ta).' });
+    return;
+  }
+  const targetLanguage: Language = rawLang;
+
+  if (!body.answer || typeof body.answer !== 'object') {
+    sendJson(res, 400, { error: 'Valid answer object is required.' });
+    return;
+  }
+  const answer = body.answer as StructuredAnswer;
+  if (typeof answer.title !== 'string') {
+    sendJson(res, 400, { error: 'Invalid answer payload.' });
+    return;
+  }
+
+  try {
+    const store = await getSopStore();
+    const translated = await translateSopAnswer({
+      answer,
+      targetLanguage,
+      glossary: store.glossary,
+    });
+    sendJson(res, 200, { answer: translated });
+  } catch (err) {
+    console.error('Translate pipeline error:', err);
+    const msg = (err as Error)?.message || 'Failed to translate mini guideline.';
+    sendJson(res, 500, { error: msg });
   }
 }

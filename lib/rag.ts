@@ -12,9 +12,9 @@ import type {
 } from './types.ts';
 
 const EMBED_DIM = 768;
-const MAX_TOP_CHUNKS = 8;
-const MAX_TOTAL_CHUNKS = 14;
-const MAX_CONTEXT_CHARS = 28000;
+const MAX_TOP_CHUNKS = 9;
+const MAX_TOTAL_CHUNKS = 16;
+const MAX_CONTEXT_CHARS = 32000;
 
 interface LoadedChunkRecord {
   docMeta: SopDocMeta;
@@ -227,7 +227,39 @@ export function searchSopChunks(
   }
 
   const qNorm = computeNorm(queryVector);
-  const queryTerms = Array.from(new Set(tokenizeEnglishTechTerms(queryText)));
+  const baseTerms = Array.from(new Set(tokenizeEnglishTechTerms(queryText)));
+  const expandedTerms = new Set(baseTerms);
+  if (
+    baseTerms.some((t) =>
+      /^(replace|replacing|replacement|swap|change|changing|faulty|damaged|defective|remove|removing|removal|dismantle|decommission|unmount)$/.test(
+        t
+      )
+    )
+  ) {
+    for (const extra of [
+      'install',
+      'installation',
+      'remove',
+      'disconnect',
+      'power',
+      'breaker',
+      'ground',
+      'grounding',
+      'pgnd',
+      'waste',
+      'safety',
+    ]) {
+      expandedTerms.add(extra);
+    }
+  }
+  if (baseTerms.some((t) => /^(battery|batteries|bb|li-ion)$/.test(t))) {
+    for (const extra of ['battery', 'rectifier', 'breaker', 'dc', 'waste', 'li-ion']) {
+      expandedTerms.add(extra);
+    }
+  }
+
+  const queryTerms = Array.from(expandedTerms);
+  const baseTermSet = new Set(baseTerms);
   const k1 = 1.2;
   const b = 0.75;
 
@@ -241,7 +273,8 @@ export function searchSopChunks(
         if (tf === 0) continue;
         const termIdf = store.idf.get(term) || 0.5;
         const denom = tf + k1 * (1 - b + (b * rec.docLen) / (store.avgDocLen || 1));
-        bm25 += termIdf * ((tf * (k1 + 1)) / denom);
+        const weight = baseTermSet.has(term) ? 1 : 0.45;
+        bm25 += weight * termIdf * ((tf * (k1 + 1)) / denom);
       }
     }
     // Small capped keyword boost for English technical terms

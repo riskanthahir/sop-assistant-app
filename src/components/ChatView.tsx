@@ -37,15 +37,89 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [loadingStage, setLoadingStage] = useState<'searching' | 'writing' | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [currentQA, setCurrentQA] = useState<SavedQA | null>(activeQA);
+  const [answerLang, setAnswerLang] = useState<Language>(activeQA?.language || language);
+  const [translatingLang, setTranslatingLang] = useState<Language | null>(null);
+  const [translateError, setTranslateError] = useState<string | null>(null);
   const answerTopRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setCurrentQA(activeQA);
-  }, [activeQA]);
+    setAnswerLang(activeQA?.language || language);
+    setTranslateError(null);
+    setTranslatingLang(null);
+  }, [activeQA, language]);
 
   const speech = useSpeechInput(language, (transcript) => {
     setInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
   });
+
+  const handleTranslateAnswer = async (targetLang: Language) => {
+    if (!currentQA || translatingLang) return;
+    setTranslateError(null);
+
+    if (targetLang === currentQA.language || currentQA.translations?.[targetLang]) {
+      setAnswerLang(targetLang);
+      return;
+    }
+
+    if (!isOnline) {
+      setTranslateError(t.offlineBanner);
+      return;
+    }
+
+    setTranslatingLang(targetLang);
+    try {
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-access-code': accessCode,
+        },
+        body: JSON.stringify({
+          answer: currentQA.answer,
+          targetLanguage: targetLang,
+        }),
+      });
+
+      if (response.status === 401) {
+        onUnauthorized();
+        return;
+      }
+
+      if (!response.ok) {
+        let msg = t.translateError;
+        try {
+          const errJson = (await response.json()) as { error?: string };
+          if (errJson.error) msg = errJson.error;
+        } catch {
+          // ignore
+        }
+        setTranslateError(msg);
+        return;
+      }
+
+      const data = (await response.json()) as { answer?: SavedQA['answer'] };
+      if (!data.answer) {
+        setTranslateError(t.translateError);
+        return;
+      }
+
+      const updatedQA: SavedQA = {
+        ...currentQA,
+        translations: {
+          ...(currentQA.translations || {}),
+          [targetLang]: data.answer,
+        },
+      };
+      setCurrentQA(updatedQA);
+      setAnswerLang(targetLang);
+      onSaveQA(updatedQA);
+    } catch {
+      setTranslateError(t.translateError);
+    } finally {
+      setTranslatingLang(null);
+    }
+  };
 
   const submitQuestion = async (questionText: string) => {
     const trimmed = questionText.trim();
@@ -122,6 +196,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
               answer: event.answer,
             };
             setCurrentQA(saved);
+            setAnswerLang(language);
+            setTranslateError(null);
             onSaveQA(saved);
             setInput('');
             setTimeout(() => {
@@ -145,6 +221,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
             answer: event.answer,
           };
           setCurrentQA(saved);
+          setAnswerLang(language);
+          setTranslateError(null);
           onSaveQA(saved);
           setInput('');
         } else if (event.type === 'error') {
@@ -228,30 +306,53 @@ export const ChatView: React.FC<ChatViewProps> = ({
         )}
 
         {/* Active Q&A */}
-        {currentQA && (
-          <div ref={answerTopRef} className="space-y-3">
-            <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900/70 px-4 py-3">
-              <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                {currentQA.question}
-              </span>
-              <button
-                type="button"
-                onClick={() => setCurrentQA(null)}
-                className="shrink-0 rounded-lg px-2.5 min-h-[36px] text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-800 whitespace-nowrap"
-              >
-                {t.close}
-              </button>
+        {currentQA && (() => {
+          const displayedAnswer =
+            answerLang === currentQA.language
+              ? currentQA.answer
+              : currentQA.translations?.[answerLang] || currentQA.answer;
+          const cachedLanguages: Language[] = [
+            currentQA.language,
+            ...((Object.keys(currentQA.translations || {}) as Language[]).filter(
+              (l) => l !== currentQA.language
+            )),
+          ];
+
+          return (
+            <div ref={answerTopRef} className="space-y-3">
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900/70 px-4 py-3">
+                <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                  {currentQA.question}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCurrentQA(null)}
+                  className="shrink-0 rounded-lg px-2.5 min-h-[36px] text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-800 whitespace-nowrap"
+                >
+                  {t.close}
+                </button>
+              </div>
+              <AnswerView
+                qaId={currentQA.id}
+                question={currentQA.question}
+                answer={displayedAnswer}
+                answerLanguage={
+                  answerLang === currentQA.language || currentQA.translations?.[answerLang]
+                    ? answerLang
+                    : currentQA.language
+                }
+                cachedLanguages={cachedLanguages}
+                translatingLang={translatingLang}
+                translateError={translateError}
+                isOnline={isOnline}
+                onTranslate={(lang) => void handleTranslateAnswer(lang)}
+                reportUrl={reportUrl}
+                dark={dark}
+                t={t}
+              />
             </div>
-            <AnswerView
-              qaId={currentQA.id}
-              question={currentQA.question}
-              answer={currentQA.answer}
-              reportUrl={reportUrl}
-              dark={dark}
-              t={t}
-            />
-          </div>
-        )}
+          );
+        })()}
 
         {/* 3-language safety footer */}
         <footer className="pt-4 pb-2 text-center space-y-1">

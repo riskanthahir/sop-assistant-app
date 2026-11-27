@@ -142,4 +142,5 @@ export interface SavedQA {
   language: Language;
   createdAt: string;
   answer: StructuredAnswer;
+  translations?: Partial<Record<Language, StructuredAnswer>>;
 }

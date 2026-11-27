@@ -9,6 +9,12 @@ export const TRANSLATIONS: Record<Language, UIStrings> = {
   ta,
 };
 
+export const LANGUAGE_OPTIONS: Array<{ code: Language; label: string }> = [
+  { code: 'en', label: 'EN' },
+  { code: 'si', label: 'සිංහල' },
+  { code: 'ta', label: 'தமிழ்' },
+];
+
 export const SAFETY_FOOTER_ALL_LANGUAGES = [
   { lang: 'EN', text: 'Verify against the original SOP before safety-critical work.' },
   { lang: 'සිංහල', text: 'ආරක්ෂාවට අදාළ වැදගත් කාර්යයන්ට පෙර මුල් SOP ලේඛනය සමඟ සසඳා තහවුරු කරගන්න.' },

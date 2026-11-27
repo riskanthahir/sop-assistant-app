@@ -16,10 +16,11 @@ import {
   GitBranch,
   HardHat,
   HelpCircle,
+  Languages,
   Layers,
-  ListChecks,
+  ListOrdered,
+  Loader2,
   LogOut,
-  RotateCcw,
   Share2,
   ShieldAlert,
   Sparkles,
@@ -28,14 +29,21 @@ import {
   Users,
   Wrench,
 } from 'lucide-react';
+import { LANGUAGE_OPTIONS, TRANSLATIONS } from '../i18n';
 import type { UIStrings } from '../i18n/en';
-import type { StructuredAnswer } from '../types';
+import type { Language, StructuredAnswer } from '../types';
 import { MermaidDiagram } from './MermaidDiagram';
 
 interface AnswerViewProps {
   qaId: string;
   question: string;
   answer: StructuredAnswer;
+  answerLanguage: Language;
+  cachedLanguages: Language[];
+  translatingLang: Language | null;
+  translateError: string | null;
+  isOnline: boolean;
+  onTranslate: (lang: Language) => void;
   reportUrl: string;
   dark: boolean;
   t: UIStrings;
@@ -138,12 +146,12 @@ function formatAnswerForPlainText(question: string, answer: StructuredAnswer, t:
   }
 
   if (answer.steps.length > 0) {
-    lines.push(t.sections.steps);
+    lines.push(t.sections.steps.toUpperCase());
     answer.steps.forEach((s) => {
-      lines.push(`${s.no}. ${s.action}`);
+      lines.push(`${s.no}. ${s.phase ? `[${s.phase}] ` : ''}${s.action}`);
       if (s.details) lines.push(`   ${s.details}`);
-      if (s.caution) lines.push(`   Caution: ${s.caution}`);
-      if (s.check) lines.push(`   Check: ${s.check}`);
+      if (s.caution) lines.push(`   ${t.stepLabels.caution}: ${s.caution}`);
+      if (s.check) lines.push(`   ${t.stepLabels.verify}: ${s.check}`);
     });
     lines.push('');
   }
@@ -168,6 +176,12 @@ export const AnswerView: React.FC<AnswerViewProps> = ({
   qaId,
   question,
   answer,
+  answerLanguage,
+  cachedLanguages,
+  translatingLang,
+  translateError,
+  isOnline,
+  onTranslate,
   reportUrl,
   dark,
   t,
@@ -176,43 +190,15 @@ export const AnswerView: React.FC<AnswerViewProps> = ({
   const [copied, setCopied] = useState(false);
   const [flowchartFailed, setFlowchartFailed] = useState(false);
 
-  const storageKey = `sop_checklist_${qaId}`;
-  const [checkedSteps, setCheckedSteps] = useState<Record<string, boolean>>({});
+  const answerT = TRANSLATIONS[answerLanguage];
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(storageKey);
-      setCheckedSteps(saved ? (JSON.parse(saved) as Record<string, boolean>) : {});
-    } catch {
-      setCheckedSteps({});
-    }
     setFlowchartFailed(false);
-  }, [storageKey]);
-
-  const toggleStep = (stepKey: string) => {
-    setCheckedSteps((prev) => {
-      const next = { ...prev, [stepKey]: !prev[stepKey] };
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(next));
-      } catch {
-        // ignore quota errors
-      }
-      return next;
-    });
-  };
-
-  const resetChecklist = () => {
-    setCheckedSteps({});
-    try {
-      localStorage.removeItem(storageKey);
-    } catch {
-      // ignore
-    }
-  };
+  }, [qaId, answerLanguage]);
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(formatAnswerForPlainText(question, answer, t));
+      await navigator.clipboard.writeText(formatAnswerForPlainText(question, answer, answerT));
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch {
@@ -221,7 +207,7 @@ export const AnswerView: React.FC<AnswerViewProps> = ({
   };
 
   const handleShare = async () => {
-    const text = formatAnswerForPlainText(question, answer, t);
+    const text = formatAnswerForPlainText(question, answer, answerT);
     if (navigator.share) {
       try {
         await navigator.share({
@@ -241,23 +227,22 @@ export const AnswerView: React.FC<AnswerViewProps> = ({
   }, []);
 
   const safeReportHref = sanitizeSafeHref(reportUrl);
-  const completedCount = answer.steps.filter((s, idx) => checkedSteps[`${idx}_${s.no}`]).length;
 
   const statusConfig =
     answer.status === 'answered'
       ? {
-          label: t.statusAnswered,
+          label: answerT.statusAnswered,
           icon: <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />,
           textClass: 'text-emerald-700 dark:text-emerald-400',
         }
       : answer.status === 'partially_covered'
       ? {
-          label: t.statusPartial,
+          label: answerT.statusPartial,
           icon: <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />,
           textClass: 'text-amber-700 dark:text-amber-400',
         }
       : {
-          label: t.statusNotCovered,
+          label: answerT.statusNotCovered,
           icon: <HelpCircle className="h-4 w-4 text-slate-500 dark:text-slate-400" />,
           textClass: 'text-slate-600 dark:text-slate-300',
         };
@@ -335,17 +320,62 @@ export const AnswerView: React.FC<AnswerViewProps> = ({
             )}
           </div>
         </div>
+
+        {/* Translate Mini Guideline Row */}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
+            {translatingLang ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-sky-600 dark:text-sky-400" />
+            ) : (
+              <Languages className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
+            )}
+            <span>{translatingLang ? t.translating : t.translateLabel}</span>
+          </div>
+
+          <div
+            role="group"
+            aria-label={t.translateLabel}
+            className="inline-flex rounded-lg bg-slate-100 dark:bg-slate-800 p-0.5"
+          >
+            {LANGUAGE_OPTIONS.map((opt) => {
+              const active = answerLanguage === opt.code;
+              const isCached = cachedLanguages.includes(opt.code);
+              const disabled = Boolean(translatingLang) || (!isOnline && !isCached);
+              return (
+                <button
+                  key={opt.code}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => onTranslate(opt.code)}
+                  className={`px-2.5 min-h-[34px] rounded-md text-xs font-medium whitespace-nowrap transition-colors disabled:opacity-45 ${
+                    active
+                      ? 'bg-white dark:bg-slate-950 text-sky-700 dark:text-sky-400 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {translateError && (
+          <p role="alert" className="mt-2 text-xs text-red-700 dark:text-red-300">
+            {translateError}
+          </p>
+        )}
       </div>
 
       {/* 1. Critical Warnings (Pinned at top in red, always visible) */}
       {answer.critical_warnings.length > 0 && (
         <section
-          aria-label={t.sections.criticalWarnings}
+          aria-label={answerT.sections.criticalWarnings}
           className="rounded-2xl border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-4 sm:p-5"
         >
           <div className="flex items-center gap-2 text-red-800 dark:text-red-300 font-display text-sm sm:text-base font-bold">
             <AlertOctagon className="h-5 w-5 shrink-0" />
-            <span>{t.sections.criticalWarnings}</span>
+            <span>{answerT.sections.criticalWarnings}</span>
           </div>
           <ul className="mt-3 space-y-2">
             {answer.critical_warnings.map((w, i) => (
@@ -363,10 +393,10 @@ export const AnswerView: React.FC<AnswerViewProps> = ({
         </section>
       )}
 
-      {/* 2. Scope Summary */}
-      {!quickView && answer.scope_summary && (
+      {/* 2. Guideline Basis & Scope (Shown in both Quick and Full view) */}
+      {answer.scope_summary && (
         <CollapsibleCard
-          title={t.sections.scopeSummary}
+          title={answerT.sections.scopeSummary}
           icon={<Target className="h-4 w-4 text-sky-600 dark:text-sky-400" />}
         >
           <p className="text-sm text-slate-700 dark:text-slate-200 leading-relaxed">
@@ -381,7 +411,7 @@ export const AnswerView: React.FC<AnswerViewProps> = ({
       {/* 3. Applies To */}
       {!quickView && answer.applies_to.length > 0 && (
         <CollapsibleCard
-          title={t.sections.appliesTo}
+          title={answerT.sections.appliesTo}
           icon={<Users className="h-4 w-4 text-sky-600 dark:text-sky-400" />}
           count={answer.applies_to.length}
         >
@@ -401,7 +431,7 @@ export const AnswerView: React.FC<AnswerViewProps> = ({
       {/* 4. Prerequisites */}
       {!quickView && answer.prerequisites.length > 0 && (
         <CollapsibleCard
-          title={t.sections.prerequisites}
+          title={answerT.sections.prerequisites}
           icon={<FileCheck2 className="h-4 w-4 text-sky-600 dark:text-sky-400" />}
           count={answer.prerequisites.length}
         >
@@ -421,7 +451,7 @@ export const AnswerView: React.FC<AnswerViewProps> = ({
       {/* 5. Materials & Tools (Table) */}
       {!quickView && answer.materials_tools.length > 0 && (
         <CollapsibleCard
-          title={t.sections.materialsTools}
+          title={answerT.sections.materialsTools}
           icon={<Wrench className="h-4 w-4 text-sky-600 dark:text-sky-400" />}
           count={answer.materials_tools.length}
         >
@@ -429,9 +459,9 @@ export const AnswerView: React.FC<AnswerViewProps> = ({
             <table className="w-full min-w-[460px] text-left text-sm border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  <th className="py-2 pr-3">{t.tableCols.item}</th>
-                  <th className="py-2 pr-3">{t.tableCols.specQty}</th>
-                  <th className="py-2 pr-3">{t.tableCols.type}</th>
+                  <th className="py-2 pr-3">{answerT.tableCols.item}</th>
+                  <th className="py-2 pr-3">{answerT.tableCols.specQty}</th>
+                  <th className="py-2 pr-3">{answerT.tableCols.type}</th>
                   <th className="py-2 text-right">Src</th>
                 </tr>
               </thead>
@@ -461,7 +491,7 @@ export const AnswerView: React.FC<AnswerViewProps> = ({
       {/* 6. Hazards & PPE */}
       {!quickView && answer.hazards_ppe.length > 0 && (
         <CollapsibleCard
-          title={t.sections.hazardsPpe}
+          title={answerT.sections.hazardsPpe}
           icon={<HardHat className="h-4 w-4 text-amber-600 dark:text-amber-400" />}
           count={answer.hazards_ppe.length}
         >
@@ -481,119 +511,75 @@ export const AnswerView: React.FC<AnswerViewProps> = ({
         </CollapsibleCard>
       )}
 
-      {/* 7. Steps Checklist (Always shown in both Quick view and Full view) */}
+      {/* 7. Mini Guideline Steps (Always shown in both Quick view and Full view, no checklists) */}
       {answer.steps.length > 0 && (
         <CollapsibleCard
-          title={t.sections.steps}
-          icon={<ListChecks className="h-4 w-4 text-sky-600 dark:text-sky-400" />}
+          title={answerT.sections.steps}
+          icon={<ListOrdered className="h-4 w-4 text-sky-600 dark:text-sky-400" />}
           count={answer.steps.length}
-          rightAction={
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-mono text-slate-500 dark:text-slate-400 tabular-nums">
-                {completedCount}/{answer.steps.length} {t.stepsCompleted}
-              </span>
-              {completedCount > 0 && (
-                <button
-                  type="button"
-                  onClick={resetChecklist}
-                  title={t.resetChecklist}
-                  className="inline-flex items-center justify-center min-h-[36px] min-w-[36px] rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
-          }
         >
-          <div className="space-y-2.5">
-            {answer.steps.map((step, idx) => {
-              const key = `${idx}_${step.no}`;
-              const done = Boolean(checkedSteps[key]);
-              return (
-                <div
-                  key={key}
-                  className={`rounded-xl border p-3.5 transition-colors ${
-                    done
-                      ? 'border-emerald-300 dark:border-emerald-800/70 bg-emerald-50/50 dark:bg-emerald-950/20'
-                      : 'border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40'
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => toggleStep(key)}
-                    aria-pressed={done}
-                    className="flex w-full items-start gap-3 text-left min-h-[44px]"
-                  >
-                    <span
-                      className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition-colors ${
-                        done
-                          ? 'border-emerald-600 bg-emerald-600 text-white'
-                          : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900'
-                      }`}
-                    >
-                      {done && <Check className="h-4 w-4" />}
-                    </span>
+          <ol className="space-y-3">
+            {answer.steps.map((step, idx) => (
+              <li
+                key={`${idx}_${step.no}`}
+                className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 p-3.5"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="mt-0.5 flex h-6 min-w-[24px] px-1.5 shrink-0 items-center justify-center rounded-md bg-sky-100 dark:bg-sky-900/50 font-mono text-xs font-bold text-sky-700 dark:text-sky-300 tabular-nums">
+                    {step.no}
+                  </span>
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2 flex-wrap">
-                        <span className="font-mono text-xs font-semibold text-sky-700 dark:text-sky-400 tabular-nums">
-                          {step.no}.
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2 flex-wrap">
+                      {step.phase && (
+                        <span className="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-400">
+                          {step.phase}
                         </span>
-                        {step.phase && (
-                          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                            {step.phase} ·
-                          </span>
-                        )}
-                        <span
-                          className={`text-sm sm:text-base font-semibold leading-snug ${
-                            done
-                              ? 'line-through text-slate-500 dark:text-slate-400'
-                              : 'text-slate-900 dark:text-slate-100'
-                          }`}
-                        >
-                          {step.action}
-                        </span>
-                        <span className="font-mono text-xs text-slate-400 ml-auto">
-                          [{step.sources.join(',')}]
-                        </span>
-                      </div>
-
-                      {step.details && (
-                        <p className="mt-1.5 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-                          {step.details}
-                        </p>
                       )}
-
-                      {step.caution && (
-                        <p className="mt-2 flex items-start gap-1.5 text-xs font-medium text-amber-800 dark:text-amber-300">
-                          <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                          <span>
-                            {t.stepLabels.caution}: {step.caution}
-                          </span>
-                        </p>
-                      )}
-
-                      {step.check && (
-                        <p className="mt-1.5 flex items-start gap-1.5 text-xs font-medium text-sky-800 dark:text-sky-300">
-                          <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                          <span>
-                            {t.stepLabels.verify}: {step.check}
-                          </span>
-                        </p>
-                      )}
+                      <span className="font-mono text-xs text-slate-400 ml-auto">
+                        [{step.sources.join(',')}]
+                      </span>
                     </div>
-                  </button>
+
+                    <h4 className="mt-0.5 text-sm sm:text-base font-semibold text-slate-900 dark:text-slate-100 leading-snug">
+                      {step.action}
+                    </h4>
+
+                    {step.details && (
+                      <p className="mt-1.5 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                        {step.details}
+                      </p>
+                    )}
+
+                    {step.caution && (
+                      <p className="mt-2 flex items-start gap-1.5 text-xs font-medium text-amber-800 dark:text-amber-300">
+                        <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                        <span>
+                          {answerT.stepLabels.caution}: {step.caution}
+                        </span>
+                      </p>
+                    )}
+
+                    {step.check && (
+                      <p className="mt-1.5 flex items-start gap-1.5 text-xs font-medium text-sky-800 dark:text-sky-300">
+                        <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                        <span>
+                          {answerT.stepLabels.verify}: {step.check}
+                        </span>
+                      </p>
+                    )}
+                  </div>
                 </div>
-              );
-            })}
-          </div>
+              </li>
+            ))}
+          </ol>
         </CollapsibleCard>
       )}
 
       {/* 8. Flowchart (Lazy-loaded Mermaid; hidden silently on error) */}
       {!quickView && answer.flowchart && !flowchartFailed && (
         <CollapsibleCard
-          title={t.sections.flowchart}
+          title={answerT.sections.flowchart}
           icon={<GitBranch className="h-4 w-4 text-sky-600 dark:text-sky-400" />}
           defaultOpen={false}
         >
@@ -608,7 +594,7 @@ export const AnswerView: React.FC<AnswerViewProps> = ({
       {/* 9. Tables (Horizontal scroll) */}
       {!quickView && answer.tables.length > 0 && (
         <CollapsibleCard
-          title={t.sections.tables}
+          title={answerT.sections.tables}
           icon={<Table2 className="h-4 w-4 text-sky-600 dark:text-sky-400" />}
           count={answer.tables.length}
         >
@@ -662,7 +648,7 @@ export const AnswerView: React.FC<AnswerViewProps> = ({
       {/* 10. Quality Checks */}
       {!quickView && answer.quality_checks.length > 0 && (
         <CollapsibleCard
-          title={t.sections.qualityChecks}
+          title={answerT.sections.qualityChecks}
           icon={<ClipboardCheck className="h-4 w-4 text-sky-600 dark:text-sky-400" />}
           count={answer.quality_checks.length}
         >
@@ -670,8 +656,8 @@ export const AnswerView: React.FC<AnswerViewProps> = ({
             <table className="w-full min-w-[400px] text-left text-sm border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  <th className="py-2 pr-3">{t.tableCols.check}</th>
-                  <th className="py-2 pr-3">{t.tableCols.criteria}</th>
+                  <th className="py-2 pr-3">{answerT.tableCols.check}</th>
+                  <th className="py-2 pr-3">{answerT.tableCols.criteria}</th>
                   <th className="py-2 text-right">Src</th>
                 </tr>
               </thead>
@@ -698,7 +684,7 @@ export const AnswerView: React.FC<AnswerViewProps> = ({
       {/* 11. Site Cleanup */}
       {!quickView && answer.site_cleanup.length > 0 && (
         <CollapsibleCard
-          title={t.sections.siteCleanup}
+          title={answerT.sections.siteCleanup}
           icon={<Sparkles className="h-4 w-4 text-sky-600 dark:text-sky-400" />}
           count={answer.site_cleanup.length}
           defaultOpen={false}
@@ -719,7 +705,7 @@ export const AnswerView: React.FC<AnswerViewProps> = ({
       {/* 12. Exit & Handover */}
       {!quickView && answer.exit_handover.length > 0 && (
         <CollapsibleCard
-          title={t.sections.exitHandover}
+          title={answerT.sections.exitHandover}
           icon={<LogOut className="h-4 w-4 text-sky-600 dark:text-sky-400" />}
           count={answer.exit_handover.length}
           defaultOpen={false}
@@ -740,7 +726,7 @@ export const AnswerView: React.FC<AnswerViewProps> = ({
       {/* 13. Records & Reporting */}
       {!quickView && answer.records_reporting.length > 0 && (
         <CollapsibleCard
-          title={t.sections.recordsReporting}
+          title={answerT.sections.recordsReporting}
           icon={<FileText className="h-4 w-4 text-sky-600 dark:text-sky-400" />}
           count={answer.records_reporting.length}
           defaultOpen={false}
@@ -761,7 +747,7 @@ export const AnswerView: React.FC<AnswerViewProps> = ({
       {/* 14. Not Specified in SOPs */}
       {answer.not_specified.length > 0 && (
         <CollapsibleCard
-          title={t.sections.notSpecified}
+          title={answerT.sections.notSpecified}
           icon={<HelpCircle className="h-4 w-4 text-slate-500 dark:text-slate-400" />}
           count={answer.not_specified.length}
         >
@@ -776,7 +762,7 @@ export const AnswerView: React.FC<AnswerViewProps> = ({
       {/* 15. Conflicts */}
       {answer.conflicts.length > 0 && (
         <CollapsibleCard
-          title={t.sections.conflicts}
+          title={answerT.sections.conflicts}
           icon={<ShieldAlert className="h-4 w-4 text-amber-600 dark:text-amber-400" />}
           count={answer.conflicts.length}
           tone="amber"
@@ -792,7 +778,7 @@ export const AnswerView: React.FC<AnswerViewProps> = ({
       {/* 16. Related SOPs */}
       {!quickView && answer.related_sops.length > 0 && (
         <CollapsibleCard
-          title={t.sections.relatedSops}
+          title={answerT.sections.relatedSops}
           icon={<Layers className="h-4 w-4 text-sky-600 dark:text-sky-400" />}
           count={answer.related_sops.length}
           defaultOpen={false}
@@ -808,7 +794,7 @@ export const AnswerView: React.FC<AnswerViewProps> = ({
       {/* 17. References */}
       {answer.references.length > 0 && (
         <CollapsibleCard
-          title={t.sections.references}
+          title={answerT.sections.references}
           icon={<BookOpen className="h-4 w-4 text-sky-600 dark:text-sky-400" />}
           count={answer.references.length}
         >

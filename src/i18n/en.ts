@@ -30,11 +30,12 @@ export interface UIStrings {
   copied: string;
   share: string;
   reportProblem: string;
+  translateLabel: string;
+  translating: string;
+  translateError: string;
   statusAnswered: string;
   statusPartial: string;
   statusNotCovered: string;
-  stepsCompleted: string;
-  resetChecklist: string;
   sections: {
     criticalWarnings: string;
     scopeSummary: string;
@@ -118,13 +119,13 @@ export const en: UIStrings = {
   micStart: 'Speak question',
   micStop: 'Stop listening',
   searchingStage: 'Searching approved SOP documents...',
-  writingStage: 'Structuring field procedure...',
+  writingStage: 'Building mini guideline...',
   examplesLabel: 'Common field questions',
   examples: [
-    'What are the FTTH drop cable termination and bending radius rules?',
-    'How do I test a fiber link with an OTDR and what loss limits apply?',
-    'What PPE and earthing checks are required before ODF installation?',
-    'How should a dome splice closure be sealed and tested?',
+    'How do I safely replace a faulty battery bank module?',
+    'What torque and grounding rules apply when installing an RRU or AAU?',
+    'How should BBU and DCDU power and earthing cables be connected?',
+    'What checks are required before powering on BTS and rectifier equipment?',
   ],
   quickView: 'Quick view',
   fullView: 'Full view',
@@ -132,19 +133,20 @@ export const en: UIStrings = {
   copied: 'Copied',
   share: 'Share',
   reportProblem: 'Report a problem',
+  translateLabel: 'Translate',
+  translating: 'Translating...',
+  translateError: 'Unable to translate right now. Check your connection and try again.',
   statusAnswered: 'Covered by SOP',
   statusPartial: 'Partially covered',
   statusNotCovered: 'Not covered in SOPs',
-  stepsCompleted: 'completed',
-  resetChecklist: 'Reset ticks',
   sections: {
     criticalWarnings: 'Critical Safety Warnings',
-    scopeSummary: 'Scope Summary',
+    scopeSummary: 'Guideline Basis & Scope',
     appliesTo: 'Applies To',
     prerequisites: 'Prerequisites & Permits',
     materialsTools: 'Materials, Tools & Equipment',
     hazardsPpe: 'Hazards & Required PPE',
-    steps: 'Procedure Steps',
+    steps: 'Mini Guideline',
     flowchart: 'Process Flowchart',
     tables: 'Specification Tables',
     qualityChecks: 'Quality & Acceptance Checks',

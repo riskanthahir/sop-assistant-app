@@ -6,6 +6,7 @@ import 'dotenv/config';
 import {
   handleChatRequest,
   handleStatusRequest,
+  handleTranslateRequest,
   handleVerifyAccessRequest,
 } from './lib/chatHandler.ts';
 
@@ -16,7 +17,7 @@ async function startServer() {
   const app = express();
   const httpServer = http.createServer(app);
   app.set('trust proxy', true);
-  app.use(express.json({ limit: '256kb' }));
+  app.use(express.json({ limit: '512kb' }));
 
   app.get('/api/status', (req, res) => {
     void handleStatusRequest(req, res);
@@ -28,6 +29,10 @@ async function startServer() {
 
   app.post('/api/chat', (req, res) => {
     void handleChatRequest(req, res);
+  });
+
+  app.post('/api/translate', (req, res) => {
+    void handleTranslateRequest(req, res);
   });
 
   if (!isProduction) {

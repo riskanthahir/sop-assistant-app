@@ -7,6 +7,10 @@
       "maxDuration": 60,
       "includeFiles": "data/**"
     },
+    "api/translate.ts": {
+      "maxDuration": 60,
+      "includeFiles": "data/**"
+    },
     "api/status.ts": {
       "maxDuration": 10,
       "includeFiles": "data/**"
